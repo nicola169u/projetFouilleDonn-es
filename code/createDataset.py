@@ -1,105 +1,179 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
 
 
-data = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2014.xls', skiprows=13, index_col=0)
-data.reset_index(inplace=True)
-data.drop(data.columns[0], axis=1, inplace=True)
-data.drop(data.columns[4:], axis=1, inplace=True)
-data = data.drop(data.index[106:])
-data['Annee'] = 2014
+# Premier dataset avec les données les plus complètes, on a supprimé les colonnes fourchette de prix au m² et fourchette de prix au m².1
+# On a aussi supprimé les lignes avec des valeurs manquantes
+def dataset1() : 
+    # Initialiser une liste pour stocker les DataFrames de chaque année
+    dataframes = []
+    dfSalaireMoyen = pd.read_csv('../dataset/salaireModif3.csv', sep=';')
+    # Boucle sur les années de 2014 à 2023
+    for year in range(2014, 2024):
+        # Charger le fichier CSV de prix moyen au m² pour l'année en cours
+        prix_filepath = f'../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-{year}.csv'
+        
+        try:
+            dfPrixYear = pd.read_csv(prix_filepath, sep=';')
+            # print(f"Fichier de prix pour {year} chargé avec succès.")
+        except FileNotFoundError:
+            print(f"Fichier pour {year} non trouvé. Passons à l'année suivante.")
+            continue
+        
+        # Charger le fichier de densité pour l'année en cours
+        dfDensite = pd.read_csv('../dataset/populationDensity.csv', sep=';')
 
-data2 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2015.xls', skiprows=13, index_col=0)
-data2.reset_index(inplace=True)
-data2.drop(data2.columns[0], axis=1, inplace=True)
-data2.drop(data2.columns[4:], axis=1, inplace=True)
-data2 = data2.drop(data2.index[106:])
-# drop NaN values
-data2 = data2.dropna()
-data2['Annee'] = 2015
+        # Vérifier l'existence de l'année dans dfDensite
+        if str(year) in dfDensite.columns:
+            # Filtrer dfDensite pour ne garder que la colonne 'Période' (qui est la commune) et la colonne pour l'année courante
+            dfDensiteYear = dfDensite[['Période', str(year)]]
 
-data3 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2016.xls', skiprows=13, index_col=0)
-data3.reset_index(inplace=True)
-data3.drop(data3.columns[0], axis=1, inplace=True)
-data3.drop(data3.columns[4:], axis=1, inplace=True)
-data3 = data3.drop(data3.index[106:])
-# drop NaN values  
-data3 = data3.dropna()
-data3['Annee'] = 2016
+            # Renommer les colonnes pour faciliter la fusion
+            dfDensiteYear.columns = ['Commune', 'Densité par km²']
 
-data4 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2017.xls', skiprows=13, index_col=0)
-data4.reset_index(inplace=True)
-data4.drop(data4.columns[0], axis=1, inplace=True)
-data4.drop(data4.columns[4:], axis=1, inplace=True)
-data4 = data4.drop(data4.index[106:])
-# drop NaN values
-data4 = data4.dropna()
-data4['Annee'] = 2017
+            # Filtrer dfDensite pour ne garder que les communes présentes dans dfPrixYear
+            dfDensiteFiltre = dfDensiteYear[dfDensiteYear['Commune'].isin(dfPrixYear['Commune'])].copy()
 
-data5 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2018.xls', skiprows=13, index_col=0)
-data5.reset_index(inplace=True)
-data5.drop(data5.columns[0], axis=1, inplace=True)
-data5.drop(data5.columns[4:], axis=1, inplace=True)
-data5 = data5.drop(data5.index[106:])
-# drop NaN values
-data5 = data5.dropna()
-data5['Annee'] = 2018
+            # Ajouter une colonne "Année" avec la valeur de l'année courante
+            dfDensiteFiltre.loc[:, 'Année'] = year
 
-data6 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2019.xls', skiprows=13, index_col=0)
-data6.reset_index(inplace=True)
-data6.drop(data6.columns[0], axis=1, inplace=True)
-data6.drop(data6.columns[4:], axis=1, inplace=True)
-data6 = data6.drop(data6.index[106:])
-# drop NaN values
-data6 = data6.dropna()
-data6['Annee'] = 2019
+            # Fusionner les deux DataFrames sur la colonne 'Commune'
+            dfResultYear = pd.merge(dfPrixYear, dfDensiteFiltre, on='Commune', how='left')
+            
+            # Ajouter le DataFrame de l'année courante à la liste
+            dataframes.append(dfResultYear)
+            
+            # Afficher un message pour confirmer la fusion
+            # print(f"Fusion des données pour l'année {year} réussie.")
+        else:
+            print(f"L'année {year} n'est pas disponible dans le fichier de densité.")
 
-data7 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2020.xls', skiprows=13, index_col=0)
-data7.reset_index(inplace=True)
-data7.drop(data7.columns[0], axis=1, inplace=True)
-data7.drop(data7.columns[4:], axis=1, inplace=True)
-data7 = data7.drop(data7.index[106:])
-# drop NaN values
-data7 = data7.dropna()
-data7['Annee'] = 2020
+    # Concaténer tous les DataFrames de chaque année
+    dfFinal = pd.concat(dataframes, ignore_index=True)
 
-data8 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2021.xls', skiprows=10, index_col=0)
-data8.reset_index(inplace=True)
-data8.drop(data8.columns[0], axis=1, inplace=True)
-data8.drop(data8.columns[4:], axis=1, inplace=True)
-data8 = data8.drop(data8.index[106:])
-# drop NaN values
-data8 = data8.dropna()
-data8['Annee'] = 2021
+    # renommer les colonnes de dfSalaireMoyen
+    dfSalaireMoyen.columns = ['Commune', 'Année', 'Salaire moyen']
+    #supprimer dans chaque ligne de Commune les 6 premiers caractères
+    dfSalaireMoyen['Commune'] = dfSalaireMoyen['Commune'].str[6:]
+    # Fusionner dfFinal et dfSalaireMoyen
+    dfFinal = pd.merge(dfFinal, dfSalaireMoyen, on=['Commune', 'Année'], how='inner')
 
+    # convertir commune en string
+    dfFinal['Commune'] = dfFinal['Commune'].astype(str)
+    # drop les colonnes fourchette de prix
+    dfFinal = dfFinal.drop(['Fourchette de prix au m²', 'Fourchette de prix au m².1'], axis=1)
+    # enlever le signe euro dans le df
+    dfFinal['Prix moyen au m²'] = dfFinal['Prix moyen au m²'].str.replace('€', '')
+    dfFinal['Prix moyen au m².1'] = dfFinal['Prix moyen au m².1'].str.replace('€', '')
+    # On va prendre 2 décimales pour la densité et salaire moyen
+    dfFinal['Salaire moyen'] = dfFinal['Salaire moyen'].round(2)
+    dfFinal = dfFinal.replace('*', pd.NA)
 
-data9 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2022.xls', skiprows=10, index_col=0)
-data9.reset_index(inplace=True)
-data9.drop(data9.columns[0], axis=1, inplace=True)
-data9.drop(data9.columns[4:], axis=1, inplace=True)
-data9 = data9.drop(data9.index[106:])
-data9 = data9.dropna()
-data9['Annee'] = 2022
+    # suppression des lignes avec des valeurs manquantes
+    dfFinal = dfFinal.dropna()
 
-data10 = pd.read_excel('../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-2023.xls', skiprows=10, index_col=0)
-data10.reset_index(inplace=True)
-data10.drop(data10.columns[0], axis=1, inplace=True)
-data10.drop(data10.columns[4:], axis=1, inplace=True)
-data10 = data10.drop(data10.index[106:])
-data10 = data10.dropna()
-data10['Annee'] = 2023
+    # année en int 
+    dfFinal['Année'] = dfFinal['Année'].astype(int)
+    # Remplacer les virgules par des points
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].str.replace(',', '.', regex=False)
+    # Supprimer les espaces
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].str.replace(' ', '', regex=False)
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].astype(float)
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].round(2)
 
-dataConcat = pd.concat([data, data2, data3, data4, data5, data6, data7, data8, data9, data10])
-#save as xlsx
-# véfifier si le fichier concat.xlsx existe
-# si oui, le supprimer
-import os
-if os.path.exists('../dataset/concat.xlsx'):
-    os.remove('../dataset/concat.xlsx')
-# enregistrer le fichier concat.xlsx
-dataConcat.to_excel('../dataset/concat.xlsx', index=False)
+    print(dfFinal)
+
+    # Afficher un aperçu du DataFrame final
+    # print(dfFinal.head())
+    # Afficher le nombre de lignes pour chaque année pour vérifier la présence des données
+    # print(dfFinal['Année'].value_counts())
+    # sauvegarder le dataset
+    dfFinal.to_csv('../dataset/dataset1.csv', index=False)
+
+# Deuxième dataset avec les données les plus complètes, on a supprimé les colonnes fourchette de prix au m² et fourchette de prix au m².1
+# On a aussi supprimé la colonne prix moyen au m² pour les VEFA et les lignes avec des valeurs manquantes
+def dataset2():
+    # Initialiser une liste pour stocker les DataFrames de chaque année
+    dataframes = []
+    dfSalaireMoyen = pd.read_csv('../dataset/salaireModif3.csv', sep=';')
+    # Boucle sur les années de 2014 à 2023
+    for year in range(2014, 2024):
+        # Charger le fichier CSV de prix moyen au m² pour l'année en cours
+        prix_filepath = f'../dataset/prix-moyen-au-metre-carre-enregistre-par-commune-{year}.csv'
+        
+        try:
+            dfPrixYear = pd.read_csv(prix_filepath, sep=';')
+            # print(f"Fichier de prix pour {year} chargé avec succès.")
+        except FileNotFoundError:
+            print(f"Fichier pour {year} non trouvé. Passons à l'année suivante.")
+            continue
+        
+        # Charger le fichier de densité pour l'année en cours
+        dfDensite = pd.read_csv('../dataset/populationDensity.csv', sep=';')
+
+        # Vérifier l'existence de l'année dans dfDensite
+        if str(year) in dfDensite.columns:
+            # Filtrer dfDensite pour ne garder que la colonne 'Période' (qui est la commune) et la colonne pour l'année courante
+            dfDensiteYear = dfDensite[['Période', str(year)]]
+
+            # Renommer les colonnes pour faciliter la fusion
+            dfDensiteYear.columns = ['Commune', 'Densité par km²']
+
+            # Filtrer dfDensite pour ne garder que les communes présentes dans dfPrixYear
+            dfDensiteFiltre = dfDensiteYear[dfDensiteYear['Commune'].isin(dfPrixYear['Commune'])].copy()
+
+            # Ajouter une colonne "Année" avec la valeur de l'année courante
+            dfDensiteFiltre.loc[:, 'Année'] = year
+
+            # Fusionner les deux DataFrames sur la colonne 'Commune'
+            dfResultYear = pd.merge(dfPrixYear, dfDensiteFiltre, on='Commune', how='left')
+            
+            # Ajouter le DataFrame de l'année courante à la liste
+            dataframes.append(dfResultYear)
+            
+            # Afficher un message pour confirmer la fusion
+            # print(f"Fusion des données pour l'année {year} réussie.")
+        else:
+            print(f"L'année {year} n'est pas disponible dans le fichier de densité.")
+
+    # Concaténer tous les DataFrames de chaque année
+    dfFinal = pd.concat(dataframes, ignore_index=True)
+
+    # renommer les colonnes de dfSalaireMoyen
+    dfSalaireMoyen.columns = ['Commune', 'Année', 'Salaire moyen']
+    #supprimer dans chaque ligne de Commune les 6 premiers caractères
+    dfSalaireMoyen['Commune'] = dfSalaireMoyen['Commune'].str[6:]
+    # Fusionner dfFinal et dfSalaireMoyen
+    dfFinal = pd.merge(dfFinal, dfSalaireMoyen, on=['Commune', 'Année'], how='inner')
+
+    # convertir commune en string
+    dfFinal['Commune'] = dfFinal['Commune'].astype(str)
+    # drop les colonnes fourchette de prix
+    dfFinal = dfFinal.drop(['Fourchette de prix au m²', 'Fourchette de prix au m².1', 'Prix moyen au m².1'], axis=1)
+    # enlever le signe euro dans le df
+    dfFinal['Prix moyen au m²'] = dfFinal['Prix moyen au m²'].str.replace('€', '')
+    # On va prendre 2 décimales pour la densité et salaire moyen
+    dfFinal['Salaire moyen'] = dfFinal['Salaire moyen'].round(2)
+    dfFinal = dfFinal.replace('*', pd.NA)
+
+    # suppression des lignes avec des valeurs manquantes
+    dfFinal = dfFinal.dropna()
+
+    # année en int 
+    dfFinal['Année'] = dfFinal['Année'].astype(int)
+    # Remplacer les virgules par des points
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].str.replace(',', '.', regex=False)
+    # Supprimer les espaces
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].str.replace(' ', '', regex=False)
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].astype(float)
+    dfFinal['Densité par km²'] = dfFinal['Densité par km²'].round(2)
+
+    print(dfFinal)
+
+    # Afficher un aperçu du DataFrame final
+    # print(dfFinal.head())
+    # Afficher le nombre de lignes pour chaque année pour vérifier la présence des données
+    print(dfFinal['Année'].value_counts())
+    # sauvegarder le dataset
+    dfFinal.to_csv('../dataset/dataset2.csv', index=False)
+    
